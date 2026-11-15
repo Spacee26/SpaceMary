@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artemis & Ares: Mission Control & Base Commander</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        orbitron: ['Orbitron', 'sans-serif'],
+                        fredoka: ['Fredoka', 'sans-serif'],
+                        rajdhani: ['Rajdhani', 'sans-serif'],
+                    },
+                    colors: {
+                        space: {
+                            900: '#070b19',
+                            800: '#0f172a',
+                            700: '#1e293b',
+                            600: '#334155',
+                        },
+                        neon: {
+                            cyan: '#00f0ff',
+                            amber: '#ffb703',
+                            pink: '#ff007f',
+                            green: '#00f5d4',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #070b19;
+            color: #f1f5f9;
+            font-family: 'Rajdhani', sans-serif;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        .hud-panel {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(0, 240, 255, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+        }
+
+        .kid-tooltip {
+            position: relative;
+        }
+        .kid-tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 110%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0f172a;
+            border: 1px solid #00f0ff;
+            color: #e2e8f0;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            white-space: normal;
+            width: 220px;
+            z-index: 100;
+            box-shadow: 0 4px 15px rgba(0,240,255,0.3);
+            pointer-events: none;
+        }
+
+        .scanline-bg {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+        }
+
+        canvas.building-mode {
+            cursor: crosshair;
+        }
+
+        .surface-panel-glow {
+            box-shadow: inset 0 0 25px rgba(0, 240, 255, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between relative bg-space-900 text-slate-100 font-rajdhani">
+
+    <div class="fixed inset-0 scanline-bg pointer-events-none z-40 opacity-40"></div>
+
+    <!-- START / SETUP MODAL -->
+    <div id="setup-modal" class="fixed inset-0 z-50 bg-space-900/95 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-4xl w-full hud-panel rounded-3xl p-6 md:p-8 relative border-2 border-cyan-400">
+            
+            <div class="text-center mb-6">
+                <span class="bg-cyan-500/20 border border-cyan-400 text-cyan-300 font-orbitron text-xs px-3 py-1 rounded-full uppercase tracking-wider font-bold">
+                    🚀 NASA Youth STEM Explorer & Moon Base Builder
+                </span>
+                <h1 class="text-3xl md:text-5xl font-extrabold font-fredoka text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-amber-300 to-pink-500 mt-2">
+                    ARTEMIS & ARES: MISSION CONTROL
+                </h1>
+                <p class="text-sm md:text-base text-slate-300 font-medium mt-1">
+                    Diventa il Comandante dell'Avamposto Spaziale! Costruisci strutture sulla superficie, gestisci l'energia, potenziando gli strumenti e proteggendo l'equipaggio.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-6">
+                <!-- Moon Outpost -->
+                <div id="opt-lunar" onclick="chooseDestination('lunar')" class="cursor-pointer group hud-panel rounded-2xl p-5 border-2 border-cyan-400/80 bg-space-800/60 hover:bg-cyan-950/30 transition-all">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300 text-2xl">
+                            <i class="fa-solid fa-moon"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-fredoka text-xl text-cyan-300 group-hover:text-white">Luna: Cratere Shackleton</h2>
+                            <span class="text-xs text-slate-400">Base del Programma Artemis NASA</span>
+                        </div>
+                    </div>
+                    <ul class="text-xs space-y-2 text-slate-300 border-t border-cyan-900/50 pt-3 font-semibold">
+                        <li class="flex justify-between"><span>☀️ Ciclo Giorno/Notte:</span> <strong class="text-amber-300">28 Giorni Terrestri</strong></li>
+                        <li class="flex justify-between"><span>🛡️ Rischio Radiazioni:</span> <strong class="text-rose-400">Brillamenti Solari Elevati</strong></li>
+                        <li class="flex justify-between"><span>💧 Risorse Superficie:</span> <strong class="text-cyan-300">Ghiaccio nei Crateri Profondi</strong></li>
+                    </ul>
+                </div>
+
+                <!-- Mars Outpost -->
+                <div id="opt-mars" onclick="chooseDestination('mars')" class="cursor-pointer group hud-panel rounded-2xl p-5 border-2 border-amber-500/30 hover:border-amber-400 bg-space-800/60 hover:bg-orange-950/30 transition-all">
+                    <div class="flex items-center space-x-3 mb-3">
+                        <div class="w-12 h-12 rounded-2xl bg-orange-500/20 border border-orange-400 flex items-center justify-center text-orange-400 text-2xl">
+                            <i class="fa-solid fa-mars"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-fredoka text-xl text-orange-400 group-hover:text-white">Marte: Cydonia Outpost</h2>
+                            <span class="text-xs text-slate-400">Futura Colonia Umana sul Pianeta Rosso</span>
+                        </div>
+                    </div>
+                    <ul class="text-xs space-y-2 text-slate-300 border-t border-orange-900/50 pt-3 font-semibold">
+                        <li class="flex justify-between"><span>☀️ Durata Sol:</span> <strong class="text-amber-300">24.6 Ore (Simile alla Terra)</strong></li>
+                        <li class="flex justify-between"><span>🌪️ Pericolo Principale:</span> <strong class="text-rose-400">Tempeste di Sabbia Globali</strong></li>
+                        <li class="flex justify-between"><span>📡 Ritardo Comunicazioni:</span> <strong class="text-amber-300">Da 3 a 22 Minuti</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center justify-between pt-4 border-t border-slate-800 gap-4">
+                <div class="flex items-center space-x-4">
+                    <button id="sound-toggle-btn" onclick="toggleAudio()" class="px-3 py-2 bg-space-700 hover:bg-space-600 rounded-xl text-xs font-orbitron text-cyan-300 flex items-center gap-2 border border-slate-600">
+                        <i id="sound-icon" class="fa-solid fa-volume-high"></i> <span id="sound-text">AUDIO: ON</span>
+                    </button>
+                    <span class="text-xs text-slate-400">Dati Meteo Spaziale NASA Attivi</span>
+                </div>
+                <button onclick="launchMission()" class="w-full sm:w-auto px-8 py-3.5 bg-gradient-to-r from-cyan-400 via-sky-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-space-900 font-fredoka font-bold text-lg rounded-2xl shadow-lg shadow-cyan-500/30 transform hover:scale-105 transition-all">
+                    AVVIA MISSION CONTROL &rarr;
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN HEADER STRIP -->
+    <header class="hud-panel border-b border-cyan-500/30 px-4 py-3 z-20 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-3">
+            <div id="site-logo-icon" class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300 text-xl">
+                <i class="fa-solid fa-moon"></i>
+            </div>
+            <div>
+                <h1 id="outpost-title" class="font-fredoka font-bold text-lg md:text-xl text-cyan-300">
+                    ARTEMIS MOON BASE COMMANDER
+                </h1>
+                <div class="text-[11px] font-orbitron text-slate-400 flex items-center gap-2">
+                    <span id="env-badge" class="bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/40">SHACKLETON CRATER</span>
+                    <span id="day-indicator" class="text-amber-300"><i class="fa-solid fa-sun"></i> GIORNO 01</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3 bg-space-800/90 px-4 py-2 rounded-2xl border border-slate-700">
+            <div class="text-right">
+                <div class="text-[10px] uppercase text-slate-400 font-orbitron">Tempo Trascorso Missione</div>
+                <div id="time-display" class="font-orbitron font-bold text-base text-cyan-300">SOL 01 • 08:00</div>
+            </div>
+            <div class="h-7 w-px bg-slate-700"></div>
+            <div class="flex items-center space-x-1">
+                <button id="btn-pause" onclick="setSimSpeed(0)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-orbitron"><i class="fa-solid fa-pause"></i></button>
+                <button id="btn-1x" onclick="setSimSpeed(1)" class="px-2.5 py-1.5 rounded-lg bg-cyan-500 text-space-900 font-bold text-xs font-orbitron">1x</button>
+                <button id="btn-5x" onclick="setSimSpeed(5)" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-orbitron">5x</button>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2">
+            <button onclick="openQuizModal()" class="px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-space-900 rounded-xl text-xs font-fredoka font-bold flex items-center gap-2 shadow-md">
+                <i class="fa-solid fa-clipboard-question text-sm"></i> Quiz: Cosa Fare?
+            </button>
+            <button onclick="openLegendModal()" class="px-3 py-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white rounded-xl text-xs font-fredoka font-bold flex items-center gap-2 shadow-md border border-cyan-400/40">
+                <i class="fa-solid fa-book-open text-sm"></i> Legenda
+            </button>
+            <button onclick="openScienceModal()" class="px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl text-xs font-fredoka font-bold flex items-center gap-2 shadow-md">
+                <i class="fa-solid fa-flask"></i> Scienza
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN DASHBOARD CONTENT GRID -->
+    <main class="flex-1 p-3 md:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 max-w-[1800px] w-full mx-auto">
+
+        <!-- LEFT COLUMN: CORE RESOURCE PILLARS & POWER SLIDERS -->
+        <section class="lg:col-span-4 flex flex-col gap-4">
+            
+            <div class="hud-panel rounded-2xl p-4 flex flex-col gap-3">
+                <div class="flex justify-between items-center border-b border-slate-700/60 pb-2">
+                    <h2 class="font-fredoka text-lg text-cyan-300 flex items-center gap-2">
+                        <i class="fa-solid fa-scale-balanced text-amber-400"></i> Risorse e Supporto Vitale
+                    </h2>
+                    <span class="text-[10px] font-orbitron text-slate-400">NASA LIFE SUPPORT</span>
+                </div>
+
+                <div class="flex justify-between items-center p-2.5 bg-space-800/90 rounded-xl border border-amber-500/30">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-cubes text-amber-400 text-lg"></i>
+                        <span class="font-fredoka text-sm text-slate-200">Regolite / Risorse:</span>
+                    </div>
+                    <span id="val-minerals" class="font-orbitron font-bold text-base text-amber-300">150 / 500 Unità</span>
+                </div>
+
+                <!-- POWER GRID -->
+                <div class="p-3 bg-space-800/80 rounded-xl border border-slate-700/80 kid-tooltip" data-tooltip="Energia (kW): Generata dai Pannelli Solari. Alimenta moduli e sistemi!">
+                    <div class="flex justify-between items-center mb-1 font-fredoka">
+                        <span class="text-amber-300 flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-lg"></i> Rete Elettrica
+                        </span>
+                        <span id="val-power" class="font-orbitron font-bold text-sm text-amber-300">120 / 200 kW</span>
+                    </div>
+                    <div class="w-full h-3 bg-space-900 rounded-full overflow-hidden border border-slate-700">
+                        <div id="bar-power" class="h-full bg-amber-400 transition-all duration-300" style="width: 60%"></div>
+                    </div>
+                </div>
+
+                <!-- OXYGEN -->
+                <div class="p-3 bg-space-800/80 rounded-xl border border-slate-700/80 kid-tooltip" data-tooltip="Purificatori d'Aria e Trivelle mantengono l'O2 e l'idratazione!">
+                    <div class="flex justify-between items-center mb-1 font-fredoka">
+                        <span class="text-cyan-300 flex items-center gap-2">
+                            <i class="fa-solid fa-wind text-lg"></i> Ciclo Ossigeno & Acqua
+                        </span>
+                        <span id="val-o2" class="font-orbitron font-bold text-sm text-cyan-300">95% Sicuro</span>
+                    </div>
+                    <div class="w-full h-3 bg-space-900 rounded-full overflow-hidden border border-slate-700">
+                        <div id="bar-o2" class="h-full bg-cyan-400 transition-all duration-300" style="width: 95%"></div>
+                    </div>
+                </div>
+
+                <!-- HEALTH -->
+                <div class="p-3 bg-space-800/80 rounded-xl border border-slate-700/80 kid-tooltip" data-tooltip="La Cupola di Regolite e le Torrette riducono i danni da radiazioni!">
+                    <div class="flex justify-between items-center mb-1 font-fredoka">
+                        <span class="text-purple-300 flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-lg"></i> Shielding & Salute Crew
+                        </span>
+                        <span id="val-health" class="font-orbitron font-bold text-sm text-purple-300">88% Ottimale</span>
+                    </div>
+                    <div class="w-full h-3 bg-space-900 rounded-full overflow-hidden border border-slate-700">
+                        <div id="bar-health" class="h-full bg-purple-400 transition-all duration-300" style="width: 88%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POWER ALLOCATION -->
+            <div class="hud-panel rounded-2xl p-4 flex-1 flex flex-col justify-between">
+                <div>
+                    <h3 class="font-fredoka text-lg text-amber-300 border-b border-slate-700/60 pb-2 mb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-sliders mr-2"></i> Allocazione Energia Rete</span>
+                        <span id="unallocated-power" class="text-xs bg-amber-950 border border-amber-500 px-2 py-0.5 rounded text-amber-300 font-orbitron">100 kW Allocati</span>
+                    </h3>
+
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-xs font-fredoka mb-1">
+                                <span class="text-cyan-300"><i class="fa-solid fa-recycle mr-1"></i> Riciclo Aria ECLSS</span>
+                                <span id="lbl-pwr-eclss" class="font-orbitron text-amber-300">35 kW</span>
+                            </div>
+                            <input type="range" id="slider-eclss" min="0" max="100" value="35" oninput="updateAllocation()" class="w-full">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs font-fredoka mb-1">
+                                <span class="text-purple-300"><i class="fa-solid fa-magnet mr-1"></i> Scudo Magnetico</span>
+                                <span id="lbl-pwr-shield" class="font-orbitron text-amber-300">25 kW</span>
+                            </div>
+                            <input type="range" id="slider-shield" min="0" max="100" value="25" oninput="updateAllocation()" class="w-full">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs font-fredoka mb-1">
+                                <span class="text-emerald-300"><i class="fa-solid fa-satellite-dish mr-1"></i> Comms & Laboratorio</span>
+                                <span id="lbl-pwr-comms" class="font-orbitron text-amber-300">20 kW</span>
+                            </div>
+                            <input type="range" id="slider-comms" min="0" max="100" value="20" oninput="updateAllocation()" class="w-full">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs font-fredoka mb-1">
+                                <span class="text-pink-300"><i class="fa-solid fa-seedling mr-1"></i> Idroponica</span>
+                                <span id="lbl-pwr-hydro" class="font-orbitron text-amber-300">20 kW</span>
+                            </div>
+                            <input type="range" id="slider-hydro" min="0" max="100" value="20" oninput="updateAllocation()" class="w-full">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CENTER COLUMN: INTERACTIVE OUTPOST BUILDER & LOGS -->
+        <section class="lg:col-span-8 flex flex-col gap-4">
+            
+            <div class="hud-panel surface-panel-glow rounded-2xl p-3.5 relative flex-1 flex flex-col min-h-[480px]">
+                
+                <div class="flex flex-wrap justify-between items-center mb-2 px-2 gap-2 border-b border-cyan-500/30 pb-2.5">
+                    <div class="flex items-center space-x-2.5">
+                        <span class="inline-block w-3 h-3 rounded-full bg-emerald-400 animate-pulse shadow-lg shadow-emerald-400/50"></span>
+                        <h2 class="font-fredoka text-base text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-map-location-dot text-cyan-400"></i> Superficie Avamposto - Radar & Costruttore Base
+                        </h2>
+                    </div>
+                    <div class="text-xs font-orbitron text-cyan-300 flex items-center gap-3">
+                        <span class="bg-space-800 px-2.5 py-1 rounded-lg border border-slate-700">Stato: <strong id="surface-status" class="text-emerald-400">NOMINALE</strong></span>
+                        <button onclick="triggerEmergencyRepair()" class="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400 hover:bg-amber-500/40 text-amber-300 rounded-lg text-xs font-fredoka font-bold flex items-center gap-1.5 transition-all">
+                            <i class="fa-solid fa-wrench"></i> Ripara Tutto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BUILD TOOLBAR -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-2.5 p-2 bg-space-800/90 rounded-2xl border border-slate-700/80">
+                    <button onclick="selectBuilding('solar')" id="btn-build-solar" class="p-2 bg-space-700/80 hover:bg-cyan-950 border border-slate-600 rounded-xl text-left transition-all flex flex-col justify-between">
+                        <div class="flex justify-between items-center text-xs font-fredoka font-bold text-amber-300">
+                            <span><i class="fa-solid fa-solar-panel mr-1"></i> Solare</span>
+                            <span class="text-[10px] bg-amber-950 border border-amber-500/40 px-1.5 py-0.2 rounded text-amber-300">40 Reg</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 font-semibold">+30 kW</div>
+                    </button>
+
+                    <button onclick="selectBuilding('scrubber')" id="btn-build-scrubber" class="p-2 bg-space-700/80 hover:bg-cyan-950 border border-slate-600 rounded-xl text-left transition-all flex flex-col justify-between">
+                        <div class="flex justify-between items-center text-xs font-fredoka font-bold text-cyan-300">
+                            <span><i class="fa-solid fa-wind mr-1"></i> Scrubber</span>
+                            <span class="text-[10px] bg-cyan-950 border border-cyan-500/40 px-1.5 py-0.2 rounded text-cyan-300">60 Reg</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 font-semibold">+15% O2</div>
+                    </button>
+
+                    <button onclick="selectBuilding('drill')" id="btn-build-drill" class="p-2 bg-space-700/80 hover:bg-cyan-950 border border-slate-600 rounded-xl text-left transition-all flex flex-col justify-between">
+                        <div class="flex justify-between items-center text-xs font-fredoka font-bold text-blue-400">
+                            <span><i class="fa-solid fa-bore-hole mr-1"></i> Trivella</span>
+                            <span class="text-[10px] bg-blue-950 border border-blue-500/40 px-1.5 py-0.2 rounded text-blue-300">50 Reg</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 font-semibold">+5 Unità/s</div>
+                    </button>
+
+                    <button onclick="selectBuilding('dome')" id="btn-build-dome" class="p-2 bg-space-700/80 hover:bg-cyan-950 border border-slate-600 rounded-xl text-left transition-all flex flex-col justify-between">
+                        <div class="flex justify-between items-center text-xs font-fredoka font-bold text-purple-300">
+                            <span><i class="fa-solid fa-shield-cat mr-1"></i> Cupola</span>
+                            <span class="text-[10px] bg-purple-950 border border-purple-500/40 px-1.5 py-0.2 rounded text-purple-300">80 Reg</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 font-semibold">+25% Scudo</div>
+                    </button>
+
+                    <button onclick="selectBuilding('turret')" id="btn-build-turret" class="p-2 bg-space-700/80 hover:bg-cyan-950 border border-slate-600 rounded-xl text-left transition-all flex flex-col justify-between">
+                        <div class="flex justify-between items-center text-xs font-fredoka font-bold text-rose-400">
+                            <span><i class="fa-solid fa-crosshairs mr-1"></i> Torretta</span>
+                            <span class="text-[10px] bg-rose-950 border border-rose-500/40 px-1.5 py-0.2 rounded text-rose-300">70 Reg</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 mt-1 font-semibold">Difesa</div>
+                    </button>
+
+                    <button onclick="selectBuilding(null)" id="btn-build-select" class="p-2 bg-cyan-500 hover:bg-cyan-400 border border-cyan-300 rounded-xl text-space-900 text-left transition-all flex flex-col justify-between font-bold">
+                        <div class="flex justify-between items-center text-xs font-fredoka">
+                            <span><i class="fa-solid fa-hand-pointer mr-1"></i> Ispeziona</span>
+                        </div>
+                        <div class="text-[10px] opacity-80 mt-1">Seleziona Moduli</div>
+                    </button>
+                </div>
+
+                <!-- Canvas Visualizer Engine -->
+                <div class="relative flex-1 w-full bg-space-900 rounded-2xl overflow-hidden border border-slate-800 shadow-inner">
+                    <canvas id="outpostCanvas" class="w-full h-full block building-mode"></canvas>
+
+                    <!-- Selected Building Info Floating Box -->
+                    <div id="selection-info-box" class="absolute bottom-3 left-3 bg-space-900/95 border border-cyan-400 rounded-2xl p-3 text-xs font-mono hidden backdrop-blur shadow-2xl space-y-1 z-30 min-w-[200px]">
+                        <div class="text-amber-300 font-bold font-orbitron text-sm flex items-center justify-between" id="info-title">
+                            <span>Modulo Selezionato</span>
+                        </div>
+                        <div class="text-[11px] text-slate-300" id="info-status">Integrità: 100%</div>
+                        <button onclick="upgradeSelectedBuilding()" class="w-full mt-2 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-space-900 font-bold font-fredoka text-xs rounded-xl shadow-md transition-all">
+                            Potenzia Modulo (30 Regolite)
+                        </button>
+                    </div>
+
+                    <div class="absolute bottom-3 right-3 bg-space-900/90 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-orbitron text-amber-300 backdrop-blur shadow-md">
+                        <span id="canvas-env-tag">Shackleton Rim • 100% Flusso Solare</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="hud-panel rounded-2xl p-4 h-48 flex flex-col">
+                    <div class="flex justify-between items-center border-b border-slate-700/60 pb-2 mb-2">
+                        <h3 class="font-fredoka text-sm text-amber-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-terminal"></i> Registro Telemetria Mission Control
+                        </h3>
+                        <button onclick="clearLogs()" class="text-[10px] text-slate-400 hover:text-white uppercase font-orbitron">Pulisci</button>
+                    </div>
+                    <div id="log-container" class="flex-1 overflow-y-auto font-mono text-xs space-y-1.5 pr-1"></div>
+                </div>
+
+                <div class="hud-panel rounded-2xl p-4 h-48 flex flex-col justify-between border-2 border-purple-500/30">
+                    <div>
+                        <div class="flex items-center space-x-2 text-purple-300 font-fredoka text-sm mb-2">
+                            <i class="fa-solid fa-lightbulb text-amber-300 text-base"></i>
+                            <span>Lo Sapevi? (Ricerca NASA OSDR)</span>
+                        </div>
+                        <p id="osdr-fact-text" class="text-xs text-slate-300 leading-relaxed font-semibold">
+                            Gli astronauti nelle missioni lunari affrontano radiazioni cosmiche. Gli studi biologici NASA OSDR dimostrano che la regolite compressa blocca fino all'85% dei raggi nocivi!
+                        </p>
+                    </div>
+                    <button onclick="nextFact()" class="self-end px-3 py-1 bg-purple-900/50 hover:bg-purple-800 text-purple-200 text-xs font-orbitron rounded-lg border border-purple-500/40">
+                        PROSSIMO FATTO &rarr;
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- LEGENDA MODAL -->
+    <div id="legend-modal" class="fixed inset-0 z-50 bg-space-900/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="max-w-3xl w-full hud-panel rounded-3xl p-6 border-2 border-cyan-400 max-h-[90vh] overflow-y-auto relative">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+                <h2 class="font-fredoka text-2xl text-cyan-300 flex items-center gap-2">
+                    <i class="fa-solid fa-book-open text-amber-400"></i> Legenda Moduli Costruttore Avamposto
+                </h2>
+                <button onclick="closeLegendModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+            <p class="text-xs text-slate-300 mb-4 font-semibold">Clicca su qualsiasi modulo già costruito sulla mappa per selezionarlo e potenziarlo al livello successivo (costo: 30 unità di regolite).</p>
+            <button onclick="closeLegendModal()" class="w-full py-2.5 bg-cyan-500 text-space-900 font-bold rounded-xl">CHIUDI</button>
+        </div>
+    </div>
+
+    <!-- QUIZ MODAL -->
+    <div id="quiz-modal" class="fixed inset-0 z-50 bg-space-900/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="max-w-2xl w-full hud-panel rounded-3xl p-6 border-2 border-amber-400 max-h-[90vh] overflow-y-auto relative">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+                <h2 class="font-fredoka text-2xl text-amber-300 flex items-center gap-2">
+                    <i class="fa-solid fa-clipboard-check text-amber-400"></i> Decisioni di Emergenza: Cosa Fare?
+                </h2>
+                <button onclick="closeQuizModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+            <div class="flex justify-between items-center bg-space-800 p-3 rounded-2xl border border-slate-700 mb-4 font-orbitron text-xs">
+                <span>Punteggio Comandante: <strong id="quiz-score" class="text-emerald-400">100 PTS</strong></span>
+                <span>Grado NASA: <strong id="quiz-rank" class="text-cyan-300">Ufficiale Junior</strong></span>
+            </div>
+            <div id="quiz-scenario-card" class="bg-space-800/90 rounded-2xl p-5 border border-amber-500/40 mb-4">
+                <h3 id="quiz-question-title" class="font-fredoka text-lg text-slate-100 mb-2">Caricamento scenario...</h3>
+                <p id="quiz-question-desc" class="text-xs text-slate-300 mb-4">--</p>
+                <div id="quiz-options-container" class="space-y-2"></div>
+            </div>
+            <div id="quiz-feedback" class="hidden p-3 rounded-xl text-xs font-semibold mb-4 border"></div>
+            <div class="flex justify-between items-center pt-2">
+                <button onclick="loadNextQuizQuestion()" class="px-5 py-2.5 bg-cyan-400 text-space-900 font-bold text-xs rounded-xl">PROSSIMO SCENARIO</button>
+                <button onclick="closeQuizModal()" class="px-4 py-2 bg-space-700 text-slate-300 font-bold text-xs rounded-xl">CHIUDI</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCIENCE MODAL -->
+    <div id="science-modal" class="fixed inset-0 z-50 bg-space-900/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="max-w-2xl w-full hud-panel rounded-3xl p-6 border-2 border-cyan-400">
+            <h2 class="font-fredoka text-2xl text-cyan-300 mb-4">La Scienza Dietro Il Gioco</h2>
+            <p class="text-xs text-slate-300 mb-4">Basato sulle ricerche di NASA DONKI e OSDR per la protezione dalle radiazioni e la gestione delle risorse spaziali.</p>
+            <button onclick="closeScienceModal()" class="w-full py-2 bg-cyan-500 text-space-900 font-bold rounded-xl">CHIUDI</button>
+        </div>
+    </div>
+
+    <!-- SCRIPT ENGINE -->
+    <script>
+        let audioEnabled = true;
+        let audioCtx = null;
+
+        function playSound(type) {
+            if (!audioEnabled) return;
+            try {
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+                if (type === 'click') {
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                    osc.start(now); osc.stop(now + 0.05);
+                } else if (type === 'build') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now); osc.stop(now + 0.15);
+                } else if (type === 'success') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now); osc.stop(now + 0.2);
+                }
+            } catch (e) {}
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            document.getElementById('sound-text').innerText = audioEnabled ? "AUDIO: ON" : "AUDIO: OFF";
+        }
+
+        const OSDR_FACTS = [
+            "La ricerca biologica NASA OSDR dimostra che la regolite lunare compressa blocca fino all'85% delle radiazioni cosmiche!",
+            "Le piante coltivate in microgravità producono ossigeno più velocemente se esposte a LED blu-rossi mirati.",
+            "Le barriere d'acqua fungono sia da riserva idrica che da scudo contro i protoni solari durante i brillamenti."
+        ];
+        let currentFactIdx = 0;
+        function nextFact() {
+            playSound('click');
+            currentFactIdx = (currentFactIdx + 1) % OSDR_FACTS.length;
+            document.getElementById('osdr-fact-text').innerText = OSDR_FACTS[currentFactIdx];
+        }
+
+        let state = {
+            env: 'lunar',
+            sol: 1,
+            hour: 8,
+            speed: 1,
+            power: 120,
+            maxPower: 200,
+            oxygenPct: 95,
+            healthPct: 88,
+            radiation: 0.12,
+            minerals: 150,
+            maxMinerals: 500,
+            quizScore: 100,
+            allocation: { eclss: 35, shield: 25, comms: 20, hydro: 20 },
+            isDay: true,
+            weather: 'NOMINALE',
+            selectedTool: null,
+            selectedBuildingIdx: null,
+            buildings: [],
+            astronauts: [],
+            rovers: [],
+            canvas: null,
+            ctx: null,
+            simInterval: null
+        };
+
+        const QUIZ_QUESTIONS = [
+            {
+                title: "🚨 SCENARIO 1: Allarme Tempesta Solare (CME) Imminente!",
+                desc: "Il satellite di sorveglianza NASA DONKI rileva un'espulsione di massa coronale in rotta verso la base. COSA DEVI FARE?",
+                options: [
+                    { text: "Deviare la massima energia allo Scudo Magnetico e assicurarsi che le Cupole in Regolite siano integre.", correct: true, impact: "Radiazioni mitigate e salute protetta! +20 Punti." },
+                    { text: "Aumentare i laboratori scientifici per inviare più dati sulla Terra.", correct: false, impact: "Sbagliato! Senza scudi l'equipaggio subisce forti dosi di radiazioni!" }
+                ]
+            }
+        ];
+        let currentQuizIdx = 0;
+
+        function openQuizModal() { playSound('click'); document.getElementById('quiz-modal').classList.remove('hidden'); loadQuizQuestion(0); }
+        function closeQuizModal() { playSound('click'); document.getElementById('quiz-modal').classList.add('hidden'); }
+        function loadQuizQuestion(idx) {
+            const q = QUIZ_QUESTIONS[idx];
+            document.getElementById('quiz-question-title').innerText = q.title;
+            document.getElementById('quiz-question-desc').innerText = q.desc;
+            document.getElementById('quiz-feedback').classList.add('hidden');
+            const container = document.getElementById('quiz-options-container');
+            container.innerHTML = '';
+            q.options.forEach((opt, optIdx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 rounded-xl bg-space-700 hover:bg-space-600 border border-slate-600 text-xs font-semibold text-slate-200";
+                btn.innerHTML = `<span>${opt.text}</span>`;
+                btn.onclick = () => answerQuizQuestion(opt);
+                container.appendChild(btn);
+            });
+        }
+        function answerQuizQuestion(opt) {
+            const feedbackEl = document.getElementById('quiz-feedback');
+            feedbackEl.classList.remove('hidden');
+            if (opt.correct) {
+                playSound('success');
+                state.quizScore += 20;
+                feedbackEl.className = "p-3 rounded-xl text-xs font-semibold mb-4 border bg-emerald-950 border-emerald-500 text-emerald-300";
+                feedbackEl.innerHTML = `<strong>CORRETTO!</strong> ${opt.impact}`;
+            } else {
+                feedbackEl.className = "p-3 rounded-xl text-xs font-semibold mb-4 border bg-rose-950 border-rose-500 text-rose-300";
+                feedbackEl.innerHTML = `<strong>ERRATO.</strong> ${opt.impact}`;
+            }
+        }
+        function loadNextQuizQuestion() { currentQuizIdx = (currentQuizIdx + 1) % QUIZ_QUESTIONS.length; loadQuizQuestion(currentQuizIdx); }
+
+        const BUILDING_TYPES = {
+            solar: { name: 'Pannello Solare', cost: 40, powerGen: 30, o2Gen: 0, shieldBonus: 0, icon: '⚡' },
+            scrubber: { name: 'Scrubber O2', cost: 60, powerGen: -10, o2Gen: 15, shieldBonus: 0, icon: '🌬️' },
+            drill: { name: 'Trivella Ghiaccio', cost: 50, powerGen: -15, minGen: 5, shieldBonus: 0, icon: '⛏️' },
+            dome: { name: 'Cupola Regolite', cost: 80, powerGen: -5, o2Gen: 0, shieldBonus: 25, icon: '🛡️' },
+            turret: { name: 'Difesa Meteoriti', cost: 70, powerGen: -15, o2Gen: 0, shieldBonus: 10, icon: '🎯' }
+        };
+
+        function chooseDestination(dest) {
+            playSound('click');
+            state.env = dest;
+            document.getElementById('opt-lunar').classList.toggle('border-cyan-400', dest === 'lunar');
+            document.getElementById('opt-mars').classList.toggle('border-orange-400', dest === 'mars');
+        }
+
+        function launchMission() {
+            playSound('success');
+            document.getElementById('setup-modal').classList.add('hidden');
+            const isMars = state.env === 'mars';
+            document.getElementById('outpost-title').innerText = isMars ? "CYDONIA MARS BASE COMMANDER" : "ARTEMIS MOON BASE COMMANDER";
+            setupCanvas();
+            initOutpostEntities();
+            logMessage("MISSIONE", `Mission Control avviato su ${isMars ? 'Marte Cydonia' : 'Luna Shackleton'}.`, "info");
+            if (state.simInterval) clearInterval(state.simInterval);
+            state.simInterval = setInterval(gameLoop, 1200);
+            updateUI();
+        }
+
+        function initOutpostEntities() {
+            state.buildings = [
+                { type: 'dome', x: 260, y: 180, hp: 100, level: 1 },
+                { type: 'solar', x: 140, y: 140, hp: 100, level: 1 },
+                { type: 'scrubber', x: 380, y: 160, hp: 100, level: 1 }
+            ];
+            state.astronauts = [{ x: 260, y: 190, targetX: 280, targetY: 210 }];
+            state.rovers = [{ x: 200, y: 240, targetX: 420, targetY: 240, speed: 1.2 }];
+        }
+
+        function selectBuilding(type) {
+            playSound('click');
+            state.selectedTool = type;
+            state.selectedBuildingIdx = null;
+            document.getElementById('selection-info-box').classList.add('hidden');
+
+            ['solar', 'scrubber', 'drill', 'dome', 'turret'].forEach(t => {
+                const btn = document.getElementById(`btn-build-${t}`);
+                if (btn) {
+                    btn.classList.toggle('bg-cyan-500', t === type);
+                    btn.classList.toggle('text-space-900', t === type);
+                    btn.classList.toggle('bg-space-700/80', t !== type);
+                }
+            });
+        }
+
+        function updateAllocation() {
+            state.allocation.eclss = parseInt(document.getElementById('slider-eclss').value);
+            state.allocation.shield = parseInt(document.getElementById('slider-shield').value);
+            state.allocation.comms = parseInt(document.getElementById('slider-comms').value);
+            state.allocation.hydro = parseInt(document.getElementById('slider-hydro').value);
+            document.getElementById('lbl-pwr-eclss').innerText = `${state.allocation.eclss} kW`;
+            document.getElementById('lbl-pwr-shield').innerText = `${state.allocation.shield} kW`;
+            document.getElementById('lbl-pwr-comms').innerText = `${state.allocation.comms} kW`;
+            document.getElementById('lbl-pwr-hydro').innerText = `${state.allocation.hydro} kW`;
+            const total = state.allocation.eclss + state.allocation.shield + state.allocation.comms + state.allocation.hydro;
+            document.getElementById('unallocated-power').innerText = `${total} kW Allocati`;
+        }
+
+        function gameLoop() {
+            if (state.speed === 0) return;
+            state.hour++;
+            if (state.hour >= 24) { state.hour = 0; state.sol++; }
+            state.isDay = state.hour >= 6 && state.hour <= 18;
+
+            let minGen = 0;
+            state.buildings.forEach(b => {
+                if (b.type === 'drill' && b.hp > 20) minGen += 5 * b.level;
+            });
+            state.minerals = Math.min(state.maxMinerals, state.minerals + (minGen * 0.2));
+            updateUI();
+            renderCanvas();
+        }
+
+        function updateUI() {
+            document.getElementById('time-display').innerText = `SOL ${state.sol.toString().padStart(2, '0')} • ${state.hour.toString().padStart(2, '0')}:00`;
+            document.getElementById('val-minerals').innerText = `${Math.round(state.minerals)} / ${state.maxMinerals} Unità`;
+            document.getElementById('val-power').innerText = `${Math.round(state.power)} / ${state.maxPower} kW`;
+            document.getElementById('bar-power').style.width = `${Math.round((state.power/state.maxPower)*100)}%`;
+            document.getElementById('val-o2').innerText = `${Math.round(state.oxygenPct)}% Sicuro`;
+            document.getElementById('bar-o2').style.width = `${Math.round(state.oxygenPct)}%`;
+            document.getElementById('val-health').innerText = `${Math.round(state.healthPct)}% Ottimale`;
+            document.getElementById('bar-health').style.width = `${Math.round(state.healthPct)}%`;
+
+            if (state.selectedBuildingIdx !== null && state.buildings[state.selectedBuildingIdx]) {
+                const b = state.buildings[state.selectedBuildingIdx];
+                const spec = BUILDING_TYPES[b.type];
+                document.getElementById('info-title').innerText = `${spec.name} (Liv. ${b.level})`;
+                document.getElementById('info-status').innerText = `Integrità: ${b.hp}% | Costo Up: 30 Reg`;
+            }
+        }
+
+        function logMessage(cat, text, type) {
+            const container = document.getElementById('log-container');
+            if(!container) return;
+            const entry = document.createElement('div');
+            entry.className = `p-1 rounded border text-[11px] flex items-start gap-1.5 text-slate-300 border-slate-800`;
+            entry.innerHTML = `<span class="opacity-60 font-mono text-[10px]">SOL ${state.sol}</span> <strong>[${cat}]</strong> <span>${text}</span>`;
+            container.prepend(entry);
+        }
+
+        function clearLogs() { document.getElementById('log-container').innerHTML = ''; }
+        function openLegendModal() { document.getElementById('legend-modal').classList.remove('hidden'); }
+        function closeLegendModal() { document.getElementById('legend-modal').classList.add('hidden'); }
+        function openScienceModal() { document.getElementById('science-modal').classList.remove('hidden'); }
+        function closeScienceModal() { document.getElementById('science-modal').classList.add('hidden'); }
+        function triggerEmergencyRepair() {
+            state.buildings.forEach(b => b.hp = 100);
+            logMessage("RIPARAZIONE", "Tutti i moduli sono stati riparati al 100%.", "info");
+        }
+        function setSimSpeed(spd) { state.speed = spd; }
+
+        function setupCanvas() {
+            state.canvas = document.getElementById('outpostCanvas');
+            if (!state.canvas) return;
+            const rect = state.canvas.parentElement.getBoundingClientRect();
+            state.canvas.width = rect.width;
+            state.canvas.height = rect.height;
+            state.ctx = state.canvas.getContext('2d');
+
+            state.canvas.onclick = (e) => {
+                const rect = state.canvas.getBoundingClientRect();
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+
+                if (state.selectedTool) {
+                    placeBuilding(state.selectedTool, clickX, clickY);
+                } else {
+                    selectBuildingAt(clickX, clickY);
+                }
+            };
+        }
+
+        function placeBuilding(type, x, y) {
+            const spec = BUILDING_TYPES[type];
+            if (state.minerals < spec.cost) {
+                logMessage("RISORSE", `Regolite insufficiente! Servono ${spec.cost} unità.`, "warning");
+                return;
+            }
+            state.minerals -= spec.cost;
+            state.buildings.push({ type: type, x: x, y: y, hp: 100, level: 1 });
+            playSound('build');
+            logMessage("COSTRUZIONE", `Nuovo ${spec.name} edificato!`, "info");
+            updateUI();
+        }
+
+        function selectBuildingAt(x, y) {
+            const foundIdx = state.buildings.findIndex(b => Math.hypot(b.x - x, b.y - y) < 30);
+            if (foundIdx !== -1) {
+                playSound('click');
+                state.selectedBuildingIdx = foundIdx;
+                document.getElementById('selection-info-box').classList.remove('hidden');
+                updateUI();
+            } else {
+                state.selectedBuildingIdx = null;
+                document.getElementById('selection-info-box').classList.add('hidden');
+            }
+        }
+
+        function upgradeSelectedBuilding() {
+            if (state.selectedBuildingIdx === null) return;
+            const b = state.buildings[state.selectedBuildingIdx];
+            if (state.minerals >= 30) {
+                state.minerals -= 30;
+                b.level += 1;
+                playSound('success');
+                logMessage("UPGRADE", `${BUILDING_TYPES[b.type].name} potenziato al Livello ${b.level}!`, "info");
+                updateUI();
+            } else {
+                logMessage("RISORSE", "Regolite insufficiente per il potenziamento (30 necessarie).", "warning");
+            }
+        }
+
+        function renderCanvas() {
+            const canvas = state.canvas;
+            const ctx = state.ctx;
+            if (!canvas || !ctx) return;
+            const w = canvas.width;
+            const h = canvas.height;
+            const isMars = state.env === 'mars';
+            const time = Date.now() * 0.002;
+
+            ctx.fillStyle = isMars ? '#3b180d' : '#070b19';
+            ctx.fillRect(0, 0, w, h);
+
+            // Ground horizon
+            ctx.fillStyle = isMars ? '#853219' : '#1e293b';
+            ctx.beginPath();
+            ctx.ellipse(w / 2, h + 120, w * 0.85, 260, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Render Buildings
+            state.buildings.forEach((b, idx) => {
+                const spec = BUILDING_TYPES[b.type];
+                const isSelected = state.selectedBuildingIdx === idx;
+
+                if (isSelected) {
+                    ctx.strokeStyle = '#00f0ff';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(b.x, b.y, 30 + Math.sin(time * 4) * 3, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#00f0ff';
+                ctx.stroke();
+
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(spec ? spec.icon : '🏢', b.x, b.y);
+
+                ctx.fillStyle = '#00f0ff';
+                ctx.font = '10px Orbitron';
+                ctx.fillText(`L${b.level}`, b.x, b.y + 24);
+            });
+        }
+    </script>
+</body>
+</html>
